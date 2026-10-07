@@ -1,14 +1,29 @@
 from flask import Flask, jsonify, render_template_string
 from datetime import datetime
+import random
 
 app = Flask(__name__)
 
 # ============================================================
-# GAME SETTINGS
+# SETTINGS
 # ============================================================
 
 SYMBOLS = ["🍒", "💎", "7", "🍋", "🍊"]
 
+# Normal symbol weights.
+# Higher = more common.
+#
+# These are intentionally NOT equal.
+# The machine should not constantly produce matches.
+SYMBOL_WEIGHTS = {
+    "🍒": 28,
+    "🍋": 25,
+    "🍊": 25,
+    "💎": 12,
+    "7": 10,
+}
+
+# Jackpot multipliers
 JACKPOTS = {
     "🍒": ("CHERRY JACKPOT", 4),
     "💎": ("DIAMOND JACKPOT", 8),
@@ -17,65 +32,185 @@ JACKPOTS = {
     "🍊": ("ORANGE JACKPOT", 2),
 }
 
-# This is intentionally NOT saved anywhere.
-# Restarting the server clears the feed.
+DOUBLE_MULTIPLIER = 1.5
+
+# In-memory event feed.
+# Nothing is saved to disk.
 jackpot_feed = []
 
 
 # ============================================================
-# PAGE
+# RANDOM SYMBOL
+# ============================================================
+
+def random_symbol():
+    symbols = list(SYMBOL_WEIGHTS.keys())
+    weights = list(SYMBOL_WEIGHTS.values())
+
+    return random.choices(
+        symbols,
+        weights=weights,
+        k=1
+    )[0]
+
+
+# ============================================================
+# SERVER-SIDE SPIN
+# ============================================================
+
+def create_spin_result():
+    """
+    The server generates the three symbols.
+
+    The browser never decides the result.
+    """
+
+    return [
+        random_symbol(),
+        random_symbol(),
+        random_symbol()
+    ]
+
+
+# ============================================================
+# DETERMINE RESULT
+# ============================================================
+
+def evaluate_spin(result):
+    a, b, c = result
+
+    # --------------------------------------------------------
+    # THREE OF A KIND
+    # --------------------------------------------------------
+
+    if a == b == c:
+
+        name, multiplier = JACKPOTS[a]
+
+        return {
+            "type": "jackpot",
+            "name": name,
+            "multiplier": multiplier,
+            "message": f"{name} — {multiplier}×"
+        }
+
+    # --------------------------------------------------------
+    # TWO OF A KIND
+    # --------------------------------------------------------
+
+    if a == b or a == c or b == c:
+
+        return {
+            "type": "double",
+            "name": "DOUBLE MATCH",
+            "multiplier": DOUBLE_MULTIPLIER,
+            "message": "DOUBLE MATCH — 1.5×"
+        }
+
+    # --------------------------------------------------------
+    # NOTHING
+    # --------------------------------------------------------
+
+    return {
+        "type": "nothing",
+        "name": "",
+        "multiplier": 0,
+        "message": "NOTHING... THE MACHINE STARES BACK."
+    }
+
+
+# ============================================================
+# ADD EVENT TO FEED
+# ============================================================
+
+def add_feed_event(result):
+    event = {
+        "name": result["name"],
+        "multiplier": result["multiplier"],
+        "time": datetime.now().isoformat()
+    }
+
+    jackpot_feed.insert(0, event)
+
+    # Keep only the most recent 50 events.
+    del jackpot_feed[50:]
+
+
+# ============================================================
+# HTML
 # ============================================================
 
 HTML = r"""
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
 
 <title>THE NIGHT SHIFT</title>
+
 
 <style>
 
 /* =========================================================
-   GENERAL
+   BASE
    ========================================================= */
 
 * {
     box-sizing: border-box;
 }
 
-html {
+html,
+body {
+    margin: 0;
     min-height: 100%;
 }
 
 body {
-    margin: 0;
-    min-height: 100vh;
+
     background:
         radial-gradient(
-            ellipse at 50% 15%,
-            #24142b 0%,
-            #100b13 42%,
-            #050507 100%
+            ellipse at 50% 0%,
+            #241522 0%,
+            #110b12 42%,
+            #040405 100%
         );
-    color: #ddd;
-    font-family: Georgia, "Times New Roman", serif;
+
+    color: #d0c6ca;
+
+    font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
     overflow-x: hidden;
 }
 
-/* Old CRT scanlines */
+
+/* CRT scanlines */
+
 body::before {
+
     content: "";
+
     position: fixed;
+
     inset: 0;
-    z-index: 100;
+
     pointer-events: none;
+
+    z-index: 100;
 
     background:
         repeating-linear-gradient(
-            to bottom,
-            rgba(255,255,255,0.018) 0px,
+            0deg,
+            rgba(255,255,255,0.018),
             rgba(255,255,255,0.018) 1px,
             transparent 1px,
             transparent 4px
@@ -84,78 +219,73 @@ body::before {
     opacity: 0.45;
 }
 
-/* Slight old-screen vignette */
+
+/* dark edges */
+
 body::after {
+
     content: "";
+
     position: fixed;
+
     inset: 0;
+
     pointer-events: none;
+
     z-index: 99;
 
     box-shadow:
         inset 0 0 180px rgba(0,0,0,0.95);
 }
 
-/* =========================================================
-   BACKGROUND DECORATION
-   ========================================================= */
-
-.wall {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0.28;
-
-    background-image:
-        radial-gradient(
-            circle at 15% 30%,
-            #4d263f 0px,
-            transparent 2px
-        ),
-        radial-gradient(
-            circle at 78% 65%,
-            #542b42 0px,
-            transparent 2px
-        ),
-        radial-gradient(
-            circle at 45% 85%,
-            #34202e 0px,
-            transparent 2px
-        );
-
-    background-size: 140px 120px, 190px 170px, 220px 190px;
-}
 
 /* =========================================================
-   MAIN WRAPPER
+   PAGE
    ========================================================= */
 
 .page {
-    width: min(1200px, 94%);
+
+    width: min(1150px, 94%);
+
     margin: auto;
-    padding: 25px 0 60px;
+
+    padding:
+        25px
+        0
+        60px;
+
     position: relative;
+
     z-index: 2;
 }
+
 
 /* =========================================================
    HEADER
    ========================================================= */
 
 .header {
+
     text-align: center;
-    margin-bottom: 24px;
+
+    margin-bottom: 25px;
 }
 
 .header-small {
-    color: #76656f;
+
+    color: #695963;
+
+    font-family: Arial, sans-serif;
+
+    font-size: 10px;
+
     letter-spacing: 6px;
-    font-size: 11px;
-    text-transform: uppercase;
+
     margin-bottom: 8px;
 }
 
 .title {
+
     margin: 0;
 
     font-family:
@@ -164,129 +294,163 @@ body::after {
         "Arial Narrow Bold",
         sans-serif;
 
-    font-size: clamp(42px, 8vw, 82px);
+    font-size:
+        clamp(42px, 8vw, 80px);
+
     letter-spacing: 5px;
-    color: #b9b0b5;
+
+    color: #bcb2b7;
 
     text-shadow:
-        3px 3px 0 #171217,
-        5px 5px 0 #080608,
-        0 0 15px rgba(255,60,50,0.13);
+        4px 4px 0 #0b090b,
+        0 0 18px rgba(150,30,40,0.2);
 
     transform: rotate(-1deg);
 }
 
 .subtitle {
-    margin-top: 5px;
-    color: #765c68;
-    font-size: 12px;
+
+    margin-top: 7px;
+
+    color: #69545f;
+
+    font-family: Arial, sans-serif;
+
+    font-size: 10px;
+
     letter-spacing: 4px;
-    text-transform: uppercase;
 }
 
+
 /* =========================================================
-   CABINET
+   MACHINE
    ========================================================= */
 
 .machine {
-    position: relative;
+
+    max-width: 900px;
+
+    margin: auto;
+
+    padding: 26px;
 
     background:
         linear-gradient(
             90deg,
-            #09090b,
-            #171216 9%,
+            #09090a,
+            #171216 10%,
             #100d11 50%,
-            #181216 91%,
+            #171216 90%,
             #080809
         );
 
-    border: 5px solid #080709;
+    border:
+        5px solid #070608;
+
     border-radius: 22px;
 
-    padding: 26px;
-
     box-shadow:
-        0 25px 55px rgba(0,0,0,0.8),
-        inset 0 0 0 2px #32242c,
+        0 30px 60px rgba(0,0,0,0.8),
+        inset 0 0 0 2px #30232a,
         inset 0 0 35px rgba(0,0,0,0.9);
 
-    max-width: 900px;
-    margin: auto;
+    position: relative;
 }
 
-/* Cabinet screws */
+
+/* screws */
 
 .machine::before,
 .machine::after {
+
     content: "";
+
     position: absolute;
 
+    top: 12px;
+
     width: 11px;
+
     height: 11px;
 
     border-radius: 50%;
-    background: #332d30;
 
-    border: 2px solid #0a090a;
+    background: #312c2e;
+
+    border: 2px solid #080708;
 
     box-shadow:
-        inset 1px 1px 2px #777,
-        0 1px 2px #000;
+        inset 1px 1px 2px #777;
 }
 
 .machine::before {
-    top: 12px;
     left: 13px;
 }
 
 .machine::after {
-    top: 12px;
     right: 13px;
 }
 
+
 /* =========================================================
-   WARNING STRIP
+   WARNING
    ========================================================= */
 
 .warning {
+
+    padding: 8px;
+
+    margin-bottom: 20px;
+
+    text-align: center;
+
     background:
         repeating-linear-gradient(
             -45deg,
-            #181315 0px,
-            #181315 10px,
-            #302127 10px,
-            #302127 20px
+            #171215 0px,
+            #171215 10px,
+            #2a1c22 10px,
+            #2a1c22 20px
         );
 
-    border: 1px solid #4b343d;
+    border: 1px solid #453039;
 
-    padding: 7px;
-
-    text-align: center;
-
-    color: #a8838e;
+    color: #94757f;
 
     font-family: Arial, sans-serif;
-    font-size: 10px;
-    letter-spacing: 3px;
 
-    margin-bottom: 20px;
+    font-size: 9px;
+
+    letter-spacing: 3px;
 }
 
+
 /* =========================================================
-   MACHINE SIGN
+   SIGN
    ========================================================= */
 
 .machine-sign {
+
     text-align: center;
+
     margin-bottom: 20px;
 }
 
 .machine-sign span {
+
     display: inline-block;
 
-    color: #d7c8ce;
+    padding:
+        7px
+        35px;
+
+    border-top:
+        2px solid #392a31;
+
+    border-bottom:
+        2px solid #392a31;
+
+    color: #c9bec4;
 
     font-family:
         Impact,
@@ -294,80 +458,81 @@ body::after {
         sans-serif;
 
     font-size: 25px;
+
     letter-spacing: 4px;
-
-    border-top: 2px solid #3b2a31;
-    border-bottom: 2px solid #3b2a31;
-
-    padding: 6px 35px;
-
-    text-shadow: 0 0 10px rgba(255,255,255,0.12);
 }
+
 
 /* =========================================================
    REELS
    ========================================================= */
 
 .reel-frame {
-    background: #050506;
-
-    border: 8px solid #0a090a;
-
-    border-radius: 12px;
 
     padding: 13px;
 
+    background: #050506;
+
+    border: 8px solid #090809;
+
+    border-radius: 12px;
+
     box-shadow:
-        inset 0 0 0 2px #31242b,
+        inset 0 0 0 2px #30242a,
         inset 0 0 30px #000,
-        0 8px 20px rgba(0,0,0,0.8);
+        0 8px 25px rgba(0,0,0,0.8);
 }
 
 .reels {
+
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
     gap: 12px;
 }
 
 .reel {
+
     height: 190px;
 
     display: flex;
+
     justify-content: center;
+
     align-items: center;
 
     background:
         linear-gradient(
             90deg,
             #08080a,
-            #17151a,
-            #09090a
+            #18161b,
+            #08080a
         );
 
     border: 3px solid #211c20;
 
     border-radius: 8px;
 
-    overflow: hidden;
-
     font-family: Arial, sans-serif;
-    font-size: clamp(65px, 11vw, 105px);
 
-    text-shadow:
-        0 0 12px rgba(255,255,255,0.18);
+    font-size:
+        clamp(65px, 11vw, 105px);
 
     box-shadow:
         inset 0 0 30px #000;
-}
 
-/* Reel spinning effect */
+    user-select: none;
+}
 
 .reel.spinning {
+
     animation:
-        reelShake 0.07s infinite linear;
+        shake 0.07s infinite linear;
 }
 
-@keyframes reelShake {
+@keyframes shake {
 
     0% {
         transform: translateY(-2px);
@@ -382,37 +547,40 @@ body::after {
     }
 }
 
+
 /* =========================================================
    BUTTON
    ========================================================= */
 
 .controls {
+
     text-align: center;
-    margin-top: 24px;
+
+    margin-top: 25px;
 }
 
 .spin-button {
-    position: relative;
 
-    border: 4px solid #260f18;
+    width: 125px;
+
+    height: 125px;
 
     border-radius: 50%;
 
-    width: 125px;
-    height: 125px;
+    border: 4px solid #270c13;
 
     cursor: pointer;
 
     background:
         radial-gradient(
-            circle at 35% 30%,
-            #ff6b5e,
-            #bd241e 40%,
-            #68100e 75%,
-            #280808
+            circle at 35% 28%,
+            #ff6c61,
+            #c02520 42%,
+            #68110f 75%,
+            #270707
         );
 
-    color: #f7d9d4;
+    color: #f3d9d6;
 
     font-family:
         Impact,
@@ -420,12 +588,12 @@ body::after {
         sans-serif;
 
     font-size: 23px;
+
     letter-spacing: 2px;
 
     box-shadow:
-        0 9px 0 #180506,
-        0 12px 25px rgba(0,0,0,0.8),
-        0 0 25px rgba(180,20,20,0.16);
+        0 9px 0 #170405,
+        0 12px 25px rgba(0,0,0,0.8);
 
     transition:
         transform 0.08s,
@@ -433,196 +601,230 @@ body::after {
 }
 
 .spin-button:hover {
+
     filter: brightness(1.15);
 }
 
 .spin-button:active {
-    transform: translateY(8px);
+
+    transform:
+        translateY(8px);
+
     box-shadow:
-        0 2px 0 #180506,
-        0 5px 15px rgba(0,0,0,0.8);
+        0 2px 0 #170405;
 }
 
 .spin-button:disabled {
+
     cursor: not-allowed;
-    filter: grayscale(0.6);
+
+    filter: grayscale(0.7);
+
     opacity: 0.6;
 }
+
 
 /* =========================================================
    RESULT
    ========================================================= */
 
 .result {
+
     min-height: 40px;
+
+    margin-top: 20px;
 
     text-align: center;
 
-    margin-top: 20px;
+    color: #655961;
 
     font-family:
         Impact,
         Haettenschweiler,
         sans-serif;
 
-    font-size: 25px;
-    letter-spacing: 2px;
+    font-size: 23px;
 
-    color: #75646b;
+    letter-spacing: 2px;
 }
 
 .result.win {
-    color: #d6b66b;
+
+    color: #d1ae68;
 
     text-shadow:
-        0 0 8px rgba(255,180,70,0.3);
+        0 0 12px rgba(255,180,70,0.25);
 
-    animation: resultFlicker 0.15s 4;
+    animation:
+        flicker 0.15s 5;
 }
 
-@keyframes resultFlicker {
+@keyframes flicker {
 
-    0%, 100% {
+    0%,
+    100% {
         opacity: 1;
     }
 
     50% {
-        opacity: 0.3;
+        opacity: 0.25;
     }
 }
 
+
 /* =========================================================
-   LOWER AREA
+   LOWER PANELS
    ========================================================= */
 
 .lower {
+
     display: grid;
-    grid-template-columns: 1fr 1.2fr;
+
+    grid-template-columns:
+        1fr 1.2fr;
+
     gap: 22px;
 
     margin-top: 24px;
 }
 
-/* =========================================================
-   PANELS
-   ========================================================= */
-
 .panel {
+
     background:
         linear-gradient(
             145deg,
             #141014,
-            #0b090c
+            #0a090c
         );
 
-    border: 2px solid #2a2027;
-
-    box-shadow:
-        inset 0 0 25px rgba(0,0,0,0.75),
-        0 10px 30px rgba(0,0,0,0.45);
+    border:
+        2px solid #2a2027;
 
     padding: 20px;
 
-    position: relative;
+    box-shadow:
+        inset 0 0 25px rgba(0,0,0,0.75),
+        0 10px 30px rgba(0,0,0,0.4);
 }
 
 .panel-title {
-    margin: 0 0 15px;
+
+    margin:
+        0
+        0
+        15px;
+
+    padding-bottom: 10px;
+
+    border-bottom:
+        1px solid #352931;
+
+    color: #a9959e;
 
     font-family:
         Impact,
         Haettenschweiler,
         sans-serif;
 
-    color: #a9959e;
-
-    font-size: 23px;
+    font-size: 22px;
 
     letter-spacing: 3px;
-
-    border-bottom: 1px solid #352931;
-
-    padding-bottom: 10px;
 }
+
 
 /* =========================================================
    PAYTABLE
    ========================================================= */
 
 .pay-row {
+
     display: flex;
-    justify-content: space-between;
+
     align-items: center;
+
+    gap: 10px;
 
     padding: 11px 4px;
 
-    border-bottom: 1px dotted #30262c;
-
-    color: #81737a;
+    border-bottom:
+        1px dotted #30262c;
 
     font-family: Arial, sans-serif;
+
+    color: #81737a;
 }
 
 .pay-symbol {
-    font-size: 22px;
+
+    min-width: 75px;
+
+    font-size: 20px;
 }
 
 .pay-name {
+
     flex: 1;
-    margin-left: 10px;
 }
 
 .pay-value {
-    color: #c9a86a;
+
+    color: #c7a664;
+
     font-weight: bold;
 }
+
 
 /* =========================================================
    JACKPOT FEED
    ========================================================= */
 
 .feed {
-    max-height: 360px;
+
+    max-height: 365px;
+
     overflow-y: auto;
-    padding-right: 5px;
 }
 
-/* Scrollbar */
-
 .feed::-webkit-scrollbar {
+
     width: 5px;
 }
 
 .feed::-webkit-scrollbar-track {
-    background: #090809;
+
+    background: #080708;
 }
 
 .feed::-webkit-scrollbar-thumb {
-    background: #392932;
+
+    background: #3c2931;
 }
 
 .feed-item {
+
     padding: 13px 10px;
 
-    border-left: 3px solid #4a252e;
-
     margin-bottom: 8px;
+
+    border-left:
+        3px solid #542630;
 
     background:
         linear-gradient(
             90deg,
-            rgba(90,35,45,0.12),
+            rgba(90,35,45,0.13),
             transparent
         );
 
-    animation: feedAppear 0.35s ease-out;
+    animation:
+        appear 0.35s ease-out;
 }
 
-@keyframes feedAppear {
+@keyframes appear {
 
     from {
         opacity: 0;
-        transform: translateX(-8px);
+        transform: translateX(-10px);
     }
 
     to {
@@ -632,59 +834,45 @@ body::after {
 }
 
 .feed-name {
+
+    color: #bcaab1;
+
     font-family:
         Impact,
         Haettenschweiler,
         sans-serif;
 
-    letter-spacing: 2px;
-
-    color: #bcaab1;
-
     font-size: 17px;
+
+    letter-spacing: 2px;
 }
 
 .feed-time {
-    color: #5f5359;
+
+    margin-top: 3px;
+
+    color: #5d5157;
+
+    font-family: Arial, sans-serif;
+
+    font-size: 11px;
+}
+
+.empty {
+
+    text-align: center;
+
+    padding: 40px 10px;
+
+    color: #4c4449;
 
     font-family: Arial, sans-serif;
 
     font-size: 11px;
 
-    margin-top: 3px;
-}
-
-.feed-empty {
-    text-align: center;
-
-    color: #4e454a;
-
-    font-family: Arial, sans-serif;
-
-    font-size: 12px;
-
-    padding: 35px 10px;
-
     letter-spacing: 2px;
 }
 
-/* =========================================================
-   FOOTER
-   ========================================================= */
-
-.footer {
-    text-align: center;
-
-    margin-top: 20px;
-
-    color: #40383d;
-
-    font-family: Arial, sans-serif;
-
-    font-size: 9px;
-
-    letter-spacing: 3px;
-}
 
 /* =========================================================
    MOBILE
@@ -715,13 +903,16 @@ body::after {
 }
 
 </style>
+
 </head>
+
 
 <body>
 
-<div class="wall"></div>
-
 <div class="page">
+
+
+    <!-- HEADER -->
 
     <header class="header">
 
@@ -740,15 +931,14 @@ body::after {
     </header>
 
 
-    <!-- =====================================================
-         SLOT MACHINE
-         ===================================================== -->
+    <!-- MACHINE -->
 
     <main class="machine">
 
         <div class="warning">
             WARNING — DO NOT OPEN CABINET — POWER MUST REMAIN ON
         </div>
+
 
         <div class="machine-sign">
             <span>HAUNTED JACKPOT</span>
@@ -759,11 +949,26 @@ body::after {
 
             <div class="reels">
 
-                <div class="reel" id="reel1">🍒</div>
+                <div
+                    class="reel"
+                    id="reel1"
+                >
+                    🍒
+                </div>
 
-                <div class="reel" id="reel2">💎</div>
+                <div
+                    class="reel"
+                    id="reel2"
+                >
+                    🍋
+                </div>
 
-                <div class="reel" id="reel3">7</div>
+                <div
+                    class="reel"
+                    id="reel3"
+                >
+                    🍊
+                </div>
 
             </div>
 
@@ -783,19 +988,22 @@ body::after {
         </div>
 
 
-        <div class="result" id="result">
-            INSERT COURAGE
+        <div
+            class="result"
+            id="result"
+        >
+            THE MACHINE IS WAITING
         </div>
 
     </main>
 
 
-    <!-- =====================================================
-         PAYTABLE + FEED
-         ===================================================== -->
+    <!-- LOWER PANELS -->
 
     <section class="lower">
 
+
+        <!-- PAYTABLE -->
 
         <div class="panel">
 
@@ -806,7 +1014,9 @@ body::after {
 
             <div class="pay-row">
 
-                <span class="pay-symbol">🍒 🍒 🍒</span>
+                <span class="pay-symbol">
+                    🍒 🍒 🍒
+                </span>
 
                 <span class="pay-name">
                     CHERRY
@@ -821,7 +1031,9 @@ body::after {
 
             <div class="pay-row">
 
-                <span class="pay-symbol">💎 💎 💎</span>
+                <span class="pay-symbol">
+                    💎 💎 💎
+                </span>
 
                 <span class="pay-name">
                     DIAMOND
@@ -836,7 +1048,9 @@ body::after {
 
             <div class="pay-row">
 
-                <span class="pay-symbol">7 7 7</span>
+                <span class="pay-symbol">
+                    7 7 7
+                </span>
 
                 <span class="pay-name">
                     SEVEN
@@ -851,7 +1065,9 @@ body::after {
 
             <div class="pay-row">
 
-                <span class="pay-symbol">🍋 🍋 🍋</span>
+                <span class="pay-symbol">
+                    🍋 🍋 🍋
+                </span>
 
                 <span class="pay-name">
                     LEMON
@@ -866,7 +1082,9 @@ body::after {
 
             <div class="pay-row">
 
-                <span class="pay-symbol">🍊 🍊 🍊</span>
+                <span class="pay-symbol">
+                    🍊 🍊 🍊
+                </span>
 
                 <span class="pay-name">
                     ORANGE
@@ -881,7 +1099,9 @@ body::after {
 
             <div class="pay-row">
 
-                <span class="pay-symbol">🍒 🍒</span>
+                <span class="pay-symbol">
+                    ANY TWO
+                </span>
 
                 <span class="pay-name">
                     DOUBLE MATCH
@@ -896,6 +1116,8 @@ body::after {
         </div>
 
 
+        <!-- FEED -->
+
         <div class="panel">
 
             <h2 class="panel-title">
@@ -906,11 +1128,17 @@ body::after {
                 class="feed"
                 id="feed"
             >
-                <div class="feed-empty">
+
+                <div class="empty">
+
                     NO JACKPOTS YET...
+
                     <br><br>
+
                     THE MACHINE IS WAITING.
+
                 </div>
+
             </div>
 
         </div>
@@ -918,18 +1146,24 @@ body::after {
     </section>
 
 
-    <footer class="footer">
-        PROPERTY OF THE NIGHT SHIFT • FREE PLAY MACHINE
-    </footer>
-
 </div>
 
 
 <script>
 
 /* =========================================================
-   GAME DATA
+   FRONT-END
    ========================================================= */
+
+let spinning = false;
+
+
+/*
+ * These symbols are only used for the visual animation.
+ *
+ * IMPORTANT:
+ * The actual result comes from Python.
+ */
 
 const symbols = [
     "🍒",
@@ -939,81 +1173,48 @@ const symbols = [
     "🍊"
 ];
 
-const jackpotNames = {
-    "🍒": "CHERRY JACKPOT",
-    "💎": "DIAMOND JACKPOT",
-    "7": "SEVEN JACKPOT",
-    "🍋": "LEMON JACKPOT",
-    "🍊": "ORANGE JACKPOT"
-};
 
-const jackpotMultipliers = {
-    "🍒": 4,
-    "💎": 8,
-    "7": 10,
-    "🍋": 2,
-    "🍊": 2
-};
+function wait(ms) {
 
-let spinning = false;
-
-
-/* =========================================================
-   RANDOM SYMBOL
-   ========================================================= */
-
-function randomSymbol() {
-
-    const index =
-        Math.floor(Math.random() * symbols.length);
-
-    return symbols[index];
+    return new Promise(
+        resolve => setTimeout(resolve, ms)
+    );
 }
 
 
 /* =========================================================
-   WAIT
+   VISUAL REEL ANIMATION
    ========================================================= */
 
-function wait(milliseconds) {
+async function animateReel(element, duration) {
 
-    return new Promise(resolve => {
-
-        setTimeout(resolve, milliseconds);
-
-    });
-}
-
-
-/* =========================================================
-   SPIN ONE REEL
-   ========================================================= */
-
-async function spinReel(reel, duration) {
-
-    reel.classList.add("spinning");
+    element.classList.add("spinning");
 
     const start = Date.now();
 
-    while (Date.now() - start < duration) {
+    while (
+        Date.now() - start < duration
+    ) {
 
-        reel.textContent = randomSymbol();
+        const symbol =
+            symbols[
+                Math.floor(
+                    Math.random() *
+                    symbols.length
+                )
+            ];
 
-        await wait(70);
+        element.textContent = symbol;
+
+        await wait(65);
     }
 
-    reel.classList.remove("spinning");
-
-    const finalSymbol = randomSymbol();
-
-    reel.textContent = finalSymbol;
-
-    return finalSymbol;
+    element.classList.remove("spinning");
 }
 
 
 /* =========================================================
-   MAIN SPIN
+   SPIN
    ========================================================= */
 
 async function spin() {
@@ -1025,166 +1226,166 @@ async function spin() {
     spinning = true;
 
     const button =
-        document.getElementById("spinButton");
+        document.getElementById(
+            "spinButton"
+        );
 
-    const result =
-        document.getElementById("result");
+    const resultText =
+        document.getElementById(
+            "result"
+        );
+
+    const reel1 =
+        document.getElementById(
+            "reel1"
+        );
+
+    const reel2 =
+        document.getElementById(
+            "reel2"
+        );
+
+    const reel3 =
+        document.getElementById(
+            "reel3"
+        );
+
 
     button.disabled = true;
 
-    result.className = "result";
+    resultText.className = "result";
 
-    result.textContent =
-        "SOMETHING IS WATCHING...";
-
-
-    const reel1 =
-        document.getElementById("reel1");
-
-    const reel2 =
-        document.getElementById("reel2");
-
-    const reel3 =
-        document.getElementById("reel3");
+    resultText.textContent =
+        "THE REELS ARE TURNING...";
 
 
     /*
-     * The reels stop at different times.
-     * This makes it feel much more like a physical machine.
+     * Start visual animations.
      */
 
-    const r1 = spinReel(reel1, 900);
+    const animation1 =
+        animateReel(reel1, 900);
 
-    await wait(180);
+    await wait(150);
 
-    const r2 = spinReel(reel2, 1250);
+    const animation2 =
+        animateReel(reel2, 1200);
 
-    await wait(180);
+    await wait(150);
 
-    const r3 = spinReel(reel3, 1600);
+    const animation3 =
+        animateReel(reel3, 1500);
 
 
-    const results = await Promise.all([
-        r1,
-        r2,
-        r3
+    /*
+     * ASK PYTHON FOR THE ACTUAL RESULT.
+     */
+
+    let serverResult;
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/spin",
+                {
+                    method: "POST"
+                }
+            );
+
+        serverResult =
+            await response.json();
+
+    } catch (error) {
+
+        console.error(error);
+
+        resultText.textContent =
+            "THE MACHINE IS BROKEN.";
+
+        button.disabled = false;
+
+        spinning = false;
+
+        return;
+    }
+
+
+    /*
+     * Wait until the visual reels finish.
+     */
+
+    await Promise.all([
+        animation1,
+        animation2,
+        animation3
     ]);
 
 
-    const a = results[0];
-    const b = results[1];
-    const c = results[2];
+    /*
+     * Show the REAL server result.
+     */
+
+    reel1.textContent =
+        serverResult.result[0];
+
+    reel2.textContent =
+        serverResult.result[1];
+
+    reel3.textContent =
+        serverResult.result[2];
 
 
-    /* =====================================================
-       THREE OF A KIND
-       ===================================================== */
+    /*
+     * Show result message.
+     */
 
-    if (a === b && b === c) {
-
-        const name = jackpotNames[a];
-
-        const multiplier =
-            jackpotMultipliers[a];
-
-        result.className =
-            "result win";
-
-        result.textContent =
-            name + " — " +
-            multiplier + "×";
-
-
-        await addJackpot(
-            name,
-            multiplier,
-            [a, b, c]
-        );
-
-    }
-
-
-    /* =====================================================
-       EXACTLY TWO MATCH
-       ===================================================== */
-
-    else if (
-        a === b ||
-        a === c ||
-        b === c
+    if (
+        serverResult.type ===
+        "jackpot"
     ) {
 
-        result.className =
+        resultText.className =
             "result win";
 
-        result.textContent =
-            "DOUBLE MATCH — 1.5×";
-
-
-        await addJackpot(
-            "DOUBLE MATCH — 1.5×",
-            1.5,
-            [a, b, c]
-        );
+        resultText.textContent =
+            serverResult.message;
 
     }
 
+    else if (
+        serverResult.type ===
+        "double"
+    ) {
 
-    /* =====================================================
-       NOTHING
-       ===================================================== */
+        resultText.className =
+            "result win";
+
+        resultText.textContent =
+            serverResult.message;
+
+    }
 
     else {
 
-        result.className =
+        resultText.className =
             "result";
 
-        result.textContent =
-            "NOTHING. THE MACHINE STARES BACK.";
-
+        resultText.textContent =
+            serverResult.message;
     }
+
+
+    /*
+     * Refresh the feed.
+     */
+
+    await loadFeed();
 
 
     button.disabled = false;
 
     spinning = false;
-}
-
-
-/* =========================================================
-   ADD JACKPOT TO SERVER FEED
-   ========================================================= */
-
-async function addJackpot(name, multiplier, combination) {
-
-    try {
-
-        await fetch("/api/jackpot", {
-
-            method: "POST",
-
-            headers: {
-                "Content-Type": "application/json"
-            },
-
-            body: JSON.stringify({
-                name: name,
-                multiplier: multiplier,
-                combination: combination
-            })
-
-        });
-
-        await loadFeed();
-
-    } catch (error) {
-
-        console.error(
-            "Could not add jackpot:",
-            error
-        );
-
-    }
 }
 
 
@@ -1197,19 +1398,25 @@ async function loadFeed() {
     try {
 
         const response =
-            await fetch("/api/jackpots");
+            await fetch(
+                "/api/jackpots"
+            );
 
-        const jackpots =
+        const events =
             await response.json();
 
         const feed =
-            document.getElementById("feed");
+            document.getElementById(
+                "feed"
+            );
 
 
-        if (jackpots.length === 0) {
+        if (
+            events.length === 0
+        ) {
 
             feed.innerHTML = `
-                <div class="feed-empty">
+                <div class="empty">
                     NO JACKPOTS YET...
                     <br><br>
                     THE MACHINE IS WAITING.
@@ -1223,36 +1430,42 @@ async function loadFeed() {
         feed.innerHTML = "";
 
 
-        jackpots.forEach(jackpot => {
+        events.forEach(event => {
 
             const item =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
             item.className =
                 "feed-item";
 
 
-            const title =
-                document.createElement("div");
+            const name =
+                document.createElement(
+                    "div"
+                );
 
-            title.className =
+            name.className =
                 "feed-name";
 
-            title.textContent =
-                jackpot.name;
+            name.textContent =
+                event.name;
 
 
             const time =
-                document.createElement("div");
+                document.createElement(
+                    "div"
+                );
 
             time.className =
                 "feed-time";
 
             time.textContent =
-                timeAgo(jackpot.time);
+                timeAgo(event.time);
 
 
-            item.appendChild(title);
+            item.appendChild(name);
 
             item.appendChild(time);
 
@@ -1262,11 +1475,7 @@ async function loadFeed() {
 
     } catch (error) {
 
-        console.error(
-            "Could not load jackpot feed:",
-            error
-        );
-
+        console.error(error);
     }
 }
 
@@ -1277,16 +1486,14 @@ async function loadFeed() {
 
 function timeAgo(timestamp) {
 
-    const then =
-        new Date(timestamp).getTime();
-
-    const now =
-        Date.now();
+    const time =
+        new Date(timestamp)
+            .getTime();
 
     const seconds =
-        Math.max(
-            0,
-            Math.floor((now - then) / 1000)
+        Math.floor(
+            (Date.now() - time) /
+            1000
         );
 
 
@@ -1300,15 +1507,20 @@ function timeAgo(timestamp) {
         return (
             seconds +
             " second" +
-            (seconds === 1 ? "" : "s") +
+            (
+                seconds === 1
+                    ? ""
+                    : "s"
+            ) +
             " ago"
         );
-
     }
 
 
     const minutes =
-        Math.floor(seconds / 60);
+        Math.floor(
+            seconds / 60
+        );
 
 
     if (minutes < 60) {
@@ -1316,15 +1528,20 @@ function timeAgo(timestamp) {
         return (
             minutes +
             " minute" +
-            (minutes === 1 ? "" : "s") +
+            (
+                minutes === 1
+                    ? ""
+                    : "s"
+            ) +
             " ago"
         );
-
     }
 
 
     const hours =
-        Math.floor(minutes / 60);
+        Math.floor(
+            minutes / 60
+        );
 
 
     if (hours < 24) {
@@ -1332,38 +1549,46 @@ function timeAgo(timestamp) {
         return (
             hours +
             " hour" +
-            (hours === 1 ? "" : "s") +
+            (
+                hours === 1
+                    ? ""
+                    : "s"
+            ) +
             " ago"
         );
-
     }
 
 
     const days =
-        Math.floor(hours / 24);
+        Math.floor(
+            hours / 24
+        );
 
 
     return (
         days +
         " day" +
-        (days === 1 ? "" : "s") +
+        (
+            days === 1
+                ? ""
+                : "s"
+        ) +
         " ago"
     );
 }
 
 
 /* =========================================================
-   UPDATE TIMES WITHOUT RELOADING EVERYTHING
+   KEEP TIMES UPDATED
    ========================================================= */
 
-setInterval(() => {
+setInterval(
+    loadFeed,
+    5000
+);
 
-    loadFeed();
 
-}, 10000);
-
-
-/* Initial feed */
+/* Initial load */
 
 loadFeed();
 
@@ -1383,72 +1608,52 @@ def home():
     return render_template_string(HTML)
 
 
-@app.route("/api/jackpots", methods=["GET"])
-def get_jackpots():
+@app.route("/api/spin", methods=["POST"])
+def spin():
 
-    # Newest first
-    return jsonify(list(reversed(jackpot_feed)))
+    # Python decides the actual outcome.
+    result = create_spin_result()
 
+    # Work out whether it is a jackpot/double/nothing.
+    outcome = evaluate_spin(result)
 
-@app.route("/api/jackpot", methods=["POST"])
-def add_jackpot():
-
-    data = request.get_json(silent=True)
-
-    if not isinstance(data, dict):
-        return jsonify({
-            "success": False
-        }), 400
-
-    name = str(
-        data.get("name", "UNKNOWN JACKPOT")
-    )
-
-    multiplier = data.get(
-        "multiplier",
-        1
-    )
-
-    combination = data.get(
-        "combination",
-        []
-    )
-
-    jackpot = {
-        "name": name,
-        "multiplier": multiplier,
-        "combination": combination,
-        "time": datetime.now().isoformat()
-    }
-
-    jackpot_feed.append(jackpot)
-
-    # Keep the current event from becoming enormous
-    # if the machine is used hundreds of times.
-    if len(jackpot_feed) > 100:
-        del jackpot_feed[:-100]
+    # Only jackpots and doubles enter the feed.
+    if outcome["type"] in ("jackpot", "double"):
+        add_feed_event(outcome)
 
     return jsonify({
-        "success": True
+        "result": result,
+        "type": outcome["type"],
+        "message": outcome["message"],
+        "multiplier": outcome["multiplier"]
     })
 
 
+@app.route("/api/jackpots", methods=["GET"])
+def get_jackpots():
+
+    return jsonify(jackpot_feed)
+
+
 # ============================================================
-# START
+# START SERVER
 # ============================================================
 
 if __name__ == "__main__":
 
     print()
     print("==============================================")
-    print("          THE NIGHT SHIFT")
-    print("       HAUNTED SLOT MACHINE")
+    print("             THE NIGHT SHIFT")
+    print("          HAUNTED SLOT MACHINE")
     print("==============================================")
     print()
-    print("Open:")
+    print("Open in your browser:")
     print("http://127.0.0.1:5000")
     print()
-    print("Press CTRL+C to stop the machine.")
+    print("No database.")
+    print("No JSON file.")
+    print("No player names.")
+    print("Jackpot feed resets when the server stops.")
     print()
 
     app.run(
