@@ -11,6 +11,7 @@ HTML = r"""
 <title>Haunted Jackpot</title>
 
 <style>
+
 * {
     box-sizing: border-box;
 }
@@ -29,12 +30,22 @@ body {
     padding: 20px;
     font-family: Arial, Helvetica, sans-serif;
     color: white;
+
     background:
-        radial-gradient(circle at 50% 35%, #35104f 0%, #100817 45%, #030305 100%);
+        radial-gradient(
+            circle at 50% 35%,
+            #35104f 0%,
+            #100817 45%,
+            #030305 100%
+        );
+
     overflow-x: hidden;
 }
 
-/* CRT EFFECT */
+
+/* ==================================================
+   CRT EFFECT
+================================================== */
 
 body::before {
     content: "";
@@ -42,6 +53,7 @@ body::before {
     inset: 0;
     pointer-events: none;
     z-index: 50;
+
     background:
         repeating-linear-gradient(
             to bottom,
@@ -52,7 +64,10 @@ body::before {
         );
 }
 
-/* VIGNETTE */
+
+/* ==================================================
+   VIGNETTE
+================================================== */
 
 body::after {
     content: "";
@@ -60,11 +75,15 @@ body::after {
     inset: 0;
     pointer-events: none;
     z-index: 49;
+
     box-shadow:
         inset 0 0 180px rgba(0,0,0,.9);
 }
 
-/* MACHINE */
+
+/* ==================================================
+   MACHINE
+================================================== */
 
 .machine {
     width: min(95vw, 850px);
@@ -91,13 +110,17 @@ body::after {
     position: relative;
 }
 
-/* DECORATION */
+
+/* ==================================================
+   DECORATION
+================================================== */
 
 .machine::before {
     content: "WARNING";
     position: absolute;
     top: 12px;
     left: 20px;
+
     font-size: 9px;
     letter-spacing: 4px;
     color: #8d8d8d;
@@ -109,17 +132,22 @@ body::after {
     position: absolute;
     bottom: 10px;
     right: 20px;
+
     font-size: 8px;
     letter-spacing: 2px;
     color: #555;
 }
 
-/* TITLE */
+
+/* ==================================================
+   TITLE
+================================================== */
 
 .title {
     font-size: clamp(30px, 7vw, 60px);
     font-weight: 900;
     letter-spacing: 7px;
+
     margin-top: 12px;
     margin-bottom: 5px;
 
@@ -138,18 +166,24 @@ body::after {
     margin-bottom: 20px;
 }
 
-/* JACKPOT SIGN */
+
+/* ==================================================
+   JACKPOT SIGN
+================================================== */
 
 .jackpot {
     display: inline-block;
+
     padding: 9px 20px;
     margin-bottom: 20px;
 
     background: #080808;
+
     border: 2px solid #4c0b14;
     border-radius: 4px;
 
     color: #b21d32;
+
     font-weight: 900;
     letter-spacing: 3px;
 
@@ -158,7 +192,10 @@ body::after {
         0 0 15px rgba(180,0,30,.15);
 }
 
-/* REELS */
+
+/* ==================================================
+   REELS
+================================================== */
 
 .reels {
     display: grid;
@@ -214,6 +251,7 @@ body::after {
 }
 
 @keyframes shake {
+
     0% {
         transform: translateY(-2px);
     }
@@ -225,9 +263,13 @@ body::after {
     100% {
         transform: translateY(-2px);
     }
+
 }
 
-/* CONTROLS */
+
+/* ==================================================
+   CONTROLS
+================================================== */
 
 .controls {
     margin-top: 25px;
@@ -278,7 +320,10 @@ body::after {
     opacity: .5;
 }
 
-/* FULLSCREEN */
+
+/* ==================================================
+   FULLSCREEN
+================================================== */
 
 #fullscreenButton {
     margin-top: 15px;
@@ -302,7 +347,10 @@ body::after {
     border-color: #777;
 }
 
-/* RESULT */
+
+/* ==================================================
+   RESULT
+================================================== */
 
 .result {
     min-height: 55px;
@@ -323,6 +371,7 @@ body::after {
 }
 
 @keyframes winFlash {
+
     from {
         transform: scale(1);
         filter: brightness(1);
@@ -332,9 +381,13 @@ body::after {
         transform: scale(1.08);
         filter: brightness(1.6);
     }
+
 }
 
-/* FEED */
+
+/* ==================================================
+   FEED
+================================================== */
 
 .feed {
     margin-top: 25px;
@@ -398,7 +451,10 @@ body::after {
     font-size: 12px;
 }
 
-/* PAYTABLE */
+
+/* ==================================================
+   PAYTABLE
+================================================== */
 
 .paytable {
     margin-top: 18px;
@@ -420,7 +476,10 @@ body::after {
     color: #aaa;
 }
 
-/* COINS */
+
+/* ==================================================
+   COINS
+================================================== */
 
 .coin {
     position: fixed;
@@ -436,6 +495,7 @@ body::after {
 }
 
 @keyframes coinFall {
+
     0% {
         transform:
             translateY(-30px)
@@ -451,9 +511,13 @@ body::after {
 
         opacity: 0;
     }
+
 }
 
-/* RESPONSIVE */
+
+/* ==================================================
+   RESPONSIVE
+================================================== */
 
 @media (max-width: 600px) {
 
@@ -479,10 +543,12 @@ body::after {
         font-size: 20px;
         padding: 16px;
     }
+
 }
 
 </style>
 </head>
+
 
 <body>
 
@@ -500,6 +566,7 @@ body::after {
         INFINITE SPINS
     </div>
 
+
     <div class="reels">
 
         <div class="reel" id="reel1">🍒</div>
@@ -510,6 +577,7 @@ body::after {
 
     </div>
 
+
     <div class="controls">
 
         <button id="spinButton" onclick="spin()">
@@ -518,8 +586,10 @@ body::after {
 
         <br>
 
-        <button id="fullscreenButton"
-                onclick="toggleFullscreen()">
+        <button
+            id="fullscreenButton"
+            onclick="toggleFullscreen()"
+        >
             ⛶ FULL SCREEN
         </button>
 
@@ -528,6 +598,7 @@ body::after {
         </div>
 
     </div>
+
 
     <div class="paytable">
 
@@ -541,6 +612,7 @@ body::after {
         ANY EXACT DOUBLE = 1.5×
 
     </div>
+
 
     <div class="feed">
 
@@ -558,6 +630,7 @@ body::after {
 
     </div>
 
+
     <div class="credits">
         Free-play machine — no real money involved.
     </div>
@@ -567,15 +640,11 @@ body::after {
 
 <script>
 
+
 /*
 ====================================================
-ORIGINAL SYMBOL SYSTEM
+SYMBOL SYSTEM
 ====================================================
-
-This is the symbol pool from your original code.
-
-Keeping all 7 symbols makes matching considerably
-harder than the 5-symbol version.
 */
 
 const symbols = [
@@ -583,6 +652,8 @@ const symbols = [
     "🍒",
     "🍋",
     "🍊",
+    "🍉",
+    "⭐",
     "💎",
     "7️⃣"
 
@@ -601,11 +672,135 @@ const reels = [
 const button =
     document.getElementById("spinButton");
 
+
 const result =
     document.getElementById("result");
 
 
 let spinning = false;
+
+
+/*
+====================================================
+DYNAMIC ODDS
+====================================================
+
+Every spin begins with:
+
+🍒 = 1
+🍋 = 1
+🍊 = 1
+🍉 = 1
+⭐ = 1
+💎 = 1
+7️⃣ = 1
+
+When a symbol is selected as a final result,
+its weight is divided by 2.
+
+Example:
+
+💎 = 1
+
+Reel 1 lands 💎
+
+💎 = 0.5
+
+Reel 2 lands 💎
+
+💎 = 0.25
+
+Reel 3 has an even smaller chance of
+landing 💎.
+
+The system resets on the next spin.
+*/
+
+let symbolWeights = {};
+
+
+function resetSymbolWeights() {
+
+    symbolWeights = {};
+
+    symbols.forEach(symbol => {
+
+        symbolWeights[symbol] = 1;
+
+    });
+
+}
+
+
+/*
+====================================================
+WEIGHTED RANDOM SYMBOL
+====================================================
+*/
+
+function weightedRandomSymbol() {
+
+    let totalWeight = 0;
+
+
+    /*
+     * Calculate the total current weight.
+     */
+
+    symbols.forEach(symbol => {
+
+        totalWeight +=
+            symbolWeights[symbol];
+
+    });
+
+
+    /*
+     * Pick a random point within
+     * the total weight.
+     */
+
+    let random =
+        Math.random() * totalWeight;
+
+
+    /*
+     * Find the symbol at that point.
+     */
+
+    for (const symbol of symbols) {
+
+        random -=
+            symbolWeights[symbol];
+
+
+        if (random <= 0) {
+
+            /*
+             * This symbol was selected.
+             *
+             * HALVE ITS WEIGHT.
+             */
+
+            symbolWeights[symbol] *= 0.5;
+
+
+            return symbol;
+
+        }
+
+    }
+
+
+    /*
+     * Fallback.
+     */
+
+    return symbols[
+        symbols.length - 1
+    ];
+
+}
 
 
 /*
@@ -617,6 +812,7 @@ AUDIO
 const AudioContext =
     window.AudioContext ||
     window.webkitAudioContext;
+
 
 let audioContext = null;
 
@@ -630,11 +826,16 @@ function getAudio() {
 
     }
 
-    if (audioContext.state === "suspended") {
+
+    if (
+        audioContext.state ===
+        "suspended"
+    ) {
 
         audioContext.resume();
 
     }
+
 
     return audioContext;
 
@@ -650,14 +851,18 @@ function beep(
 
     const ctx = getAudio();
 
+
     const oscillator =
         ctx.createOscillator();
+
 
     const gain =
         ctx.createGain();
 
 
-    oscillator.type = type;
+    oscillator.type =
+        type;
+
 
     oscillator.frequency.value =
         frequency;
@@ -681,6 +886,7 @@ function beep(
 
 
     oscillator.start();
+
 
     oscillator.stop(
         ctx.currentTime + duration
@@ -727,6 +933,7 @@ function doubleSound() {
         "sine",
         .07
     );
+
 
     setTimeout(
         () => beep(
@@ -816,24 +1023,6 @@ function jackpotSound() {
 
 /*
 ====================================================
-ORIGINAL RANDOM SYMBOL FUNCTION
-====================================================
-*/
-
-function randomSymbol() {
-
-    return symbols[
-        Math.floor(
-            Math.random() *
-            symbols.length
-        )
-    ];
-
-}
-
-
-/*
-====================================================
 COIN EFFECT
 ====================================================
 */
@@ -845,7 +1034,10 @@ function makeCoins() {
         const coin =
             document.createElement("div");
 
-        coin.className = "coin";
+
+        coin.className =
+            "coin";
+
 
         coin.textContent =
             Math.random() > .5
@@ -865,7 +1057,9 @@ function makeCoins() {
             Math.random() * .5 + "s";
 
 
-        document.body.appendChild(coin);
+        document.body.appendChild(
+            coin
+        );
 
 
         setTimeout(
@@ -898,11 +1092,9 @@ function addFeedEvent(name) {
     });
 
 
-    /*
-     * Keep the feed from growing forever.
-     */
-
-    if (feedEvents.length > 50) {
+    if (
+        feedEvents.length > 50
+    ) {
 
         feedEvents.length = 50;
 
@@ -918,7 +1110,8 @@ function timeAgo(timestamp) {
 
     const seconds =
         Math.floor(
-            (Date.now() - timestamp) / 1000
+            (Date.now() - timestamp) /
+            1000
         );
 
 
@@ -931,27 +1124,40 @@ function timeAgo(timestamp) {
 
     if (seconds < 60) {
 
-        return seconds + " seconds ago";
+        return (
+            seconds +
+            " seconds ago"
+        );
 
     }
 
 
     const minutes =
-        Math.floor(seconds / 60);
+        Math.floor(
+            seconds / 60
+        );
 
 
     if (minutes < 60) {
 
-        return minutes + " minutes ago";
+        return (
+            minutes +
+            " minutes ago"
+        );
 
     }
 
 
     const hours =
-        Math.floor(minutes / 60);
+        Math.floor(
+            minutes / 60
+        );
 
 
-    return hours + " hours ago";
+    return (
+        hours +
+        " hours ago"
+    );
 
 }
 
@@ -959,10 +1165,14 @@ function timeAgo(timestamp) {
 function renderFeed() {
 
     const feed =
-        document.getElementById("feedList");
+        document.getElementById(
+            "feedList"
+        );
 
 
-    if (feedEvents.length === 0) {
+    if (
+        feedEvents.length === 0
+    ) {
 
         feed.innerHTML = `
             <div class="emptyFeed">
@@ -999,10 +1209,6 @@ function renderFeed() {
 }
 
 
-/*
- * Update feed timestamps.
- */
-
 setInterval(
     renderFeed,
     10000
@@ -1011,30 +1217,43 @@ setInterval(
 
 /*
 ====================================================
-ORIGINAL REEL ANIMATION SYSTEM
+REEL ANIMATION
 ====================================================
 
-65ms random symbol changes.
+The final result is already selected by the
+weighted odds system.
 
-The reels stop at:
-
-Reel 1 = 1300ms
-Reel 2 = 1900ms
-Reel 3 = 2500ms
+The symbols shown during the animation are
+visual only and DO NOT affect the odds.
 */
 
-function animateReel(reel, duration) {
+function animateReel(
+    reel,
+    duration,
+    finalSymbol
+) {
 
     return new Promise(resolve => {
 
-        reel.classList.add("spinning");
+        reel.classList.add(
+            "spinning"
+        );
 
 
         const interval =
             setInterval(() => {
 
+                /*
+                 * Visual spinning symbols.
+                 */
+
                 reel.textContent =
-                    randomSymbol();
+                    symbols[
+                        Math.floor(
+                            Math.random() *
+                            symbols.length
+                        )
+                    ];
 
             }, 65);
 
@@ -1045,15 +1264,12 @@ function animateReel(reel, duration) {
 
 
             /*
-             * IMPORTANT:
-             *
-             * The final symbol is selected
-             * using the SAME original
-             * randomSymbol() system.
+             * Show the actual weighted
+             * result.
              */
 
             reel.textContent =
-                randomSymbol();
+                finalSymbol;
 
 
             reel.classList.remove(
@@ -1093,7 +1309,10 @@ async function spin() {
     button.disabled = true;
 
 
-    result.classList.remove("win");
+    result.classList.remove(
+        "win"
+    );
+
 
     result.textContent =
         "Spinning...";
@@ -1105,27 +1324,90 @@ async function spin() {
 
 
     /*
-     * Same original reel timing.
+     * ==============================================
+     * RESET EVERYTHING FOR THIS SPIN
+     * ==============================================
+     *
+     * Every symbol starts at weight 1 again.
+     */
+
+    resetSymbolWeights();
+
+
+    /*
+     * ==============================================
+     * REEL 1
+     * ==============================================
+     *
+     * All symbols have normal odds.
+     */
+
+    const first =
+        weightedRandomSymbol();
+
+
+    /*
+     * ==============================================
+     * REEL 2
+     * ==============================================
+     *
+     * The symbol that appeared on Reel 1
+     * now has HALF the weight it had before.
+     */
+
+    const second =
+        weightedRandomSymbol();
+
+
+    /*
+     * ==============================================
+     * REEL 3
+     * ==============================================
+     *
+     * Any symbols that appeared before have
+     * been halved again.
+     */
+
+    const third =
+        weightedRandomSymbol();
+
+
+    const finalValues = [
+
+        first,
+        second,
+        third
+
+    ];
+
+
+    /*
+     * ==============================================
+     * ANIMATE REELS
+     * ==============================================
      */
 
     const reel1 =
         animateReel(
             reels[0],
-            1300
+            1300,
+            finalValues[0]
         );
 
 
     const reel2 =
         animateReel(
             reels[1],
-            1900
+            1900,
+            finalValues[1]
         );
 
 
     const reel3 =
         animateReel(
             reels[2],
-            2500
+            2500,
+            finalValues[2]
         );
 
 
@@ -1138,13 +1420,13 @@ async function spin() {
     ]);
 
 
-    const values =
-        reels.map(
-            reel => reel.textContent
-        );
+    /*
+     * Check the actual final results.
+     */
 
-
-    checkResult(values);
+    checkResult(
+        finalValues
+    );
 
 
     spinning = false;
@@ -1175,14 +1457,18 @@ function checkResult(values) {
         b === c
     ) {
 
-        result.classList.add("win");
+        result.classList.add(
+            "win"
+        );
 
 
         /*
          * 7 = 10x
          */
 
-        if (a === "7️⃣") {
+        if (
+            a === "7️⃣"
+        ) {
 
             result.textContent =
                 "💀💀💀 MEGA JACKPOT — 10× 💀💀💀";
@@ -1204,7 +1490,9 @@ function checkResult(values) {
          * Diamond = 8x
          */
 
-        else if (a === "💎") {
+        else if (
+            a === "💎"
+        ) {
 
             result.textContent =
                 "💎💎💎 DIAMOND JACKPOT — 8×";
@@ -1226,7 +1514,9 @@ function checkResult(values) {
          * Cherry = 4x
          */
 
-        else if (a === "🍒") {
+        else if (
+            a === "🍒"
+        ) {
 
             result.textContent =
                 "🍒🍒🍒 CHERRY JACKPOT — 4×";
@@ -1248,7 +1538,9 @@ function checkResult(values) {
          * Lemon = 2x
          */
 
-        else if (a === "🍋") {
+        else if (
+            a === "🍋"
+        ) {
 
             result.textContent =
                 "🍋🍋🍋 LEMON JACKPOT — 2×";
@@ -1270,7 +1562,9 @@ function checkResult(values) {
          * Orange = 2x
          */
 
-        else if (a === "🍊") {
+        else if (
+            a === "🍊"
+        ) {
 
             result.textContent =
                 "🍊🍊🍊 ORANGE JACKPOT — 2×";
@@ -1289,10 +1583,12 @@ function checkResult(values) {
 
 
         /*
-         * Other symbols
+         * Star
          */
 
-        else if (a === "⭐") {
+        else if (
+            a === "⭐"
+        ) {
 
             result.textContent =
                 "⭐⭐⭐ STAR JACKPOT";
@@ -1309,6 +1605,10 @@ function checkResult(values) {
 
         }
 
+
+        /*
+         * Watermelon
+         */
 
         else {
 
@@ -1333,9 +1633,6 @@ function checkResult(values) {
 
     /*
      * EXACTLY TWO MATCH
-     *
-     * This is checked only after
-     * confirming it wasn't a triple.
      */
 
     if (
@@ -1379,21 +1676,24 @@ FULL SCREEN
 
 async function toggleFullscreen() {
 
-    const button =
+    const fullscreenButton =
         document.getElementById(
             "fullscreenButton"
         );
 
 
-    if (!document.fullscreenElement) {
+    if (
+        !document.fullscreenElement
+    ) {
 
         try {
 
-            await document.documentElement
+            await document
+                .documentElement
                 .requestFullscreen();
 
 
-            button.textContent =
+            fullscreenButton.textContent =
                 "⛶ EXIT FULL SCREEN";
 
         }
@@ -1413,7 +1713,7 @@ async function toggleFullscreen() {
 
         await document.exitFullscreen();
 
-        button.textContent =
+        fullscreenButton.textContent =
             "⛶ FULL SCREEN";
 
     }
@@ -1422,30 +1722,32 @@ async function toggleFullscreen() {
 
 
 /*
- * Keep button text correct if
- * fullscreen is exited with ESC.
+ * Keep fullscreen button correct
+ * when ESC is pressed.
  */
 
 document.addEventListener(
     "fullscreenchange",
     () => {
 
-        const button =
+        const fullscreenButton =
             document.getElementById(
                 "fullscreenButton"
             );
 
 
-        if (document.fullscreenElement) {
+        if (
+            document.fullscreenElement
+        ) {
 
-            button.textContent =
+            fullscreenButton.textContent =
                 "⛶ EXIT FULL SCREEN";
 
         }
 
         else {
 
-            button.textContent =
+            fullscreenButton.textContent =
                 "⛶ FULL SCREEN";
 
         }
